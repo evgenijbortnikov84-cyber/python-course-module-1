@@ -1,15 +1,21 @@
 def insertion_sort(numbers):
-    """Отсортировать список на месте по возрастанию и вернуть его."""
+    """Стабильно отсортировать список на месте по возрастанию.
+
+    Возвращает None. Использует обычное сравнение элементов, без key/reverse.
+    Время: O(n) для упорядоченного списка, O(n²) в среднем и худшем случае.
+    Дополнительная память: O(1).
+    """
     for index in range(1, len(numbers)):
         value = numbers[index]
         position = index
-        # Сдвигаем большие элементы уже отсортированной части вправо.
+        # Строгое > сохраняет взаимный порядок равных элементов.
         while position > 0 and numbers[position - 1] > value:
             numbers[position] = numbers[position - 1]
             position -= 1
         numbers[position] = value
-    return numbers
 
 
 if __name__ == "__main__":
-    print(insertion_sort([5, -2, 5, 1]))  # [-2, 1, 5, 5]
+    numbers = [5, -2, 5, 1]
+    insertion_sort(numbers)
+    print(numbers)
