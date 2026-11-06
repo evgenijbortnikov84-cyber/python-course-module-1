@@ -1,22 +1,43 @@
 import random
 
+START_HEALTH = 100
+SIMPLE_DAMAGE = 20
+
 
 class Warrior:
     def __init__(self, name):
         self.name = name
-        self.health = 100
+        self._health = START_HEALTH
+
+    @property
+    def health(self):
+        return self._health
+
+    def take_damage(self, amount):
+        if not isinstance(amount, int) or isinstance(amount, bool) or amount < 0:
+            raise ValueError("Урон должен быть целым неотрицательным числом")
+        lost = min(self._health, amount)
+        self._health -= lost
+        return lost
 
     def attack(self, opponent):
-        opponent.health = max(0, opponent.health - 20)
-        print(f"{self.name} атаковал. Здоровье {opponent.name}: {opponent.health}")
+        return opponent.take_damage(SIMPLE_DAMAGE)
+
+    def finish(self, *, spare):
+        self._health = max(1, self._health) if spare else 0
 
 
 def main():
+    rng = random.Random()
     warriors = [Warrior("Первый"), Warrior("Второй")]
-    while all(warrior.health > 0 for warrior in warriors):
-        attacker, opponent = random.sample(warriors, 2)
-        attacker.attack(opponent)
-    print(f"Победил {attacker.name}")
+    winner = None
+    while winner is None:
+        attacker, opponent = rng.sample(warriors, 2)
+        damage = attacker.attack(opponent)
+        print(f"{attacker.name} атаковал: урон {damage}, здоровье {opponent.name}: {opponent.health}")
+        if opponent.health == 0:
+            winner = attacker
+    print(f"Победил {winner.name}")
 
 
 if __name__ == "__main__":
