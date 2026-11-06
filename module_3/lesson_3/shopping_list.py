@@ -1,9 +1,23 @@
 """Модуль 3, урок 3: список покупок с разделением программы на функции."""
 
+from math import isfinite
+
 
 def add_position(shopping_list, name, quantity):
     """Добавить количество к новой или существующей позиции."""
-    shopping_list[name] = shopping_list.get(name, 0) + quantity
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("Название не должно быть пустым")
+    if (type(quantity) not in (int, float) or quantity <= 0
+            or isinstance(quantity, float) and not isfinite(quantity)):
+        raise ValueError("Количество должно быть положительным конечным числом")
+    name = name.strip()
+    total = shopping_list.get(name, 0) + quantity
+    if isinstance(total, float):
+        if not isfinite(total):
+            raise ValueError("Слишком большое количество")
+        if total.is_integer():
+            total = int(total)
+    shopping_list[name] = total
 
 
 def remove_position(shopping_list, name):
@@ -28,15 +42,18 @@ def add_many_positions(shopping_list):
     """Вводить позиции подряд, пока пользователь не введёт пустую строку."""
     while True:
         position = input(
-            "Название и количество; Enter — закончить: "
+            "Название и количество; Enter - закончить: "
         ).strip()
 
         if not position:
             break
 
         # Отделяем количество справа: название может содержать пробелы.
-        name, quantity = position.rsplit(maxsplit=1)
-        add_position(shopping_list, name, float(quantity))
+        try:
+            name, quantity = position.rsplit(maxsplit=1)
+            add_position(shopping_list, name, float(quantity))
+        except ValueError:
+            print("Ошибка: введите название и положительное число, например хлеб 2")
 
 
 def handle_command(command, shopping_list):

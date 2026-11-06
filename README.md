@@ -41,6 +41,10 @@ python module_1/part_1/level_2.py
 
 ## Модуль 3
 
+[Исправленные решения и правила запуска](module_3/README.md) · [Ожидаемый вывод](module_3/EXPECTED_OUTPUT.md) · [Результаты проверок](module_3/TEST_RESULTS.txt)
+
+Скриншоты в таблице ниже относятся к предыдущей версии. Актуальный вывод закреплён в тестах и документации по ссылкам выше.
+
 | Задание | Решение | Скриншот |
 | --- | --- | --- |
 | 1.1 Вклад | [Код](module_3/part_1/level_1.py) | [Открыть](screenshots/m3_1_1.png) |
@@ -57,4 +61,4 @@ python module_1/part_1/level_2.py
 | 4.3 Вход | [Код](module_3/part_4/accounts.py) | [Открыть](screenshots/m3_4_3.png) |
 | Список покупок | [Код](module_3/lesson_3/shopping_list.py) | [Открыть](screenshots/shopping_list.png) |
 
-Из корня репозитория запустите `python -m unittest discover -s tests -v`, чтобы проверить список покупок.
+Из корня репозитория запустите `python -B -m unittest discover -s tests -v`, чтобы проверить все доступные тесты, включая все части модуля 3 и список покупок.

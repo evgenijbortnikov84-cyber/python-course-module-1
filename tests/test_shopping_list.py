@@ -31,9 +31,9 @@ class ShoppingListTests(unittest.TestCase):
             "добавить", "шампунь 1", "белый хлеб 2", "шампунь 1", "",
             "показать", "удалить", "шампунь", "показать", "выход",
         )
-        self.assertIn("белый хлеб 2.0\nшампунь 2.0\n", output)
-        self.assertEqual(output.count("шампунь 2.0\n"), 1)
-        self.assertEqual(output.count("белый хлеб 2.0\n"), 2)
+        self.assertIn("белый хлеб 2\nшампунь 2\n", output)
+        self.assertEqual(output.count("шампунь 2\n"), 1)
+        self.assertEqual(output.count("белый хлеб 2\n"), 2)
 
     def test_fractional_quantities_and_multiple_batches(self):
         output = self.run_program(
@@ -60,7 +60,7 @@ class ShoppingListTests(unittest.TestCase):
         first_output = self.run_program(
             "добавить", "молоко 1", "", "показать", "выход"
         )
-        self.assertIn("молоко 1.0\n", first_output)
+        self.assertIn("молоко 1\n", first_output)
         second_output = self.run_program("показать", "выход")
         self.assertIn("Список пуст.", second_output)
         self.assertNotIn("молоко", second_output)
