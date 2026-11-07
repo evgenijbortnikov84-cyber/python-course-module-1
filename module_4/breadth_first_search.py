@@ -1,20 +1,43 @@
 from collections import deque
 
 
-def breadth_first_search_details(graph, start):
-    """Вернуть (порядок, расстояния, предшественники) для невзвешенного графа.
+def _contains_vertex(graph, vertex):
+    # Ключ проверяется сразу. Просмотр соседей нужен только для вершины без ключа.
+    return vertex in graph or any(vertex in neighbors for neighbors in graph.values())
 
-    Граф задан словарём со списками соседей. Вершины должны быть хешируемыми.
-    Вершина существует, если встречается среди ключей или соседей.
-    Неизвестная начальная вершина вызывает ValueError.
-    Время O(V + E), дополнительная память O(V).
-    """
-    vertices = set(graph)
-    for neighbors in graph.values():
-        vertices.update(neighbors)
-    if start not in vertices:
+
+def _check_start(graph, start):
+    if not _contains_vertex(graph, start):
         raise ValueError("Начальная вершина отсутствует в графе")
 
+
+def breadth_first_search(graph, start):
+    """Вернуть только порядок обхода, без расстояний и предшественников.
+
+    Граф: словарь со списками соседей; вершины хешируемые.
+    Вершины могут встречаться только среди соседей. Неизвестный start: ValueError.
+    """
+    _check_start(graph, start)
+    queue = deque([start])
+    visited = {start}
+    order = []
+    while queue:
+        vertex = queue.popleft()
+        order.append(vertex)
+        for neighbor in graph.get(vertex, ()):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    return order
+
+
+def breadth_first_search_details(graph, start):
+    """Вернуть (порядок, расстояния, предшественники) невзвешенного графа.
+
+    Неизвестный start: ValueError. Время O(V + E), память O(V).
+    Если start является ключом, недостижимая часть графа не просматривается.
+    """
+    _check_start(graph, start)
     queue = deque([start])
     distances = {start: 0}
     predecessors = {}
@@ -24,29 +47,42 @@ def breadth_first_search_details(graph, start):
         order.append(vertex)
         for neighbor in graph.get(vertex, ()):
             if neighbor not in distances:
-                # Отмечаем при добавлении, чтобы не ставить вершину повторно.
                 distances[neighbor] = distances[vertex] + 1
                 predecessors[neighbor] = vertex
                 queue.append(neighbor)
     return order, distances, predecessors
 
 
-def breadth_first_search(graph, start):
-    """Вернуть порядок обхода достижимых вершин. Неизвестный start: ValueError."""
-    order, _, _ = breadth_first_search_details(graph, start)
-    return order
-
-
 def shortest_path(graph, start, target):
-    """Вернуть кратчайший путь по числу рёбер или None для недостижимой цели."""
-    _, distances, predecessors = breadth_first_search_details(graph, start)
-    if target not in distances:
-        return None
-    path = [target]
-    while path[-1] != start:
-        path.append(predecessors[path[-1]])
-    path.reverse()
-    return path
+    """Кратчайший путь; None, если существующая цель недостижима.
+
+    Отсутствие start или target вызывает ValueError. При нескольких кратчайших
+    путях выбирается первый найденный по порядку соседей в списках.
+    Поиск останавливается при обнаружении target, не после полного обхода.
+    """
+    _check_start(graph, start)
+    if start == target:
+        return [start]
+    queue = deque([start])
+    # Словарь одновременно отмечает обнаруженные вершины и хранит родителей.
+    predecessors = {start: start}
+    while queue:
+        vertex = queue.popleft()
+        for neighbor in graph.get(vertex, ()):
+            if neighbor in predecessors:
+                continue
+            predecessors[neighbor] = vertex
+            if neighbor == target:
+                path = [target]
+                while path[-1] != start:
+                    path.append(predecessors[path[-1]])
+                path.reverse()
+                return path
+            queue.append(neighbor)
+    # Проверку откладываем: найденная цель уже заведомо существует.
+    if not _contains_vertex(graph, target):
+        raise ValueError("Целевая вершина отсутствует в графе")
+    return None
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import subprocess
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from module_4.binary_search import binary_search
 from module_4.insertion_sort import insertion_sort
@@ -114,7 +115,8 @@ class BreadthFirstSearchTests(unittest.TestCase):
         self.assertIsNone(shortest_path({"A": [], "B": []}, "A", "B"))
 
     def test_unknown_target(self):
-        self.assertIsNone(shortest_path(self.graph, "A", "missing"))
+        with self.assertRaisesRegex(ValueError, "Целевая"):
+            shortest_path(self.graph, "A", "missing")
 
     def test_neighbor_only_vertex(self):
         self.assertEqual(shortest_path({"A": ["B"]}, "A", "B"), ["A", "B"])
@@ -128,6 +130,49 @@ class BreadthFirstSearchTests(unittest.TestCase):
 
     def test_none_vertex(self):
         self.assertEqual(shortest_path({None: ["B"]}, None, "B"), [None, "B"])
+
+    def test_order_does_not_call_details(self):
+        with patch("module_4.breadth_first_search.breadth_first_search_details",
+                   side_effect=AssertionError("Лишний расчёт")):
+            self.assertEqual(breadth_first_search(self.graph, "A"), ["A", "B", "C", "D"])
+
+    def test_unreachable_neighbors_not_read(self):
+        class Unreadable:
+            def __iter__(self):
+                raise AssertionError("Недостижимая часть просмотрена")
+        graph = {"A": ["B"], "B": [], "X": Unreadable()}
+        self.assertEqual(breadth_first_search(graph, "A"), ["A", "B"])
+        self.assertEqual(breadth_first_search_details(graph, "A")[1], {"A": 0, "B": 1})
+        self.assertEqual(shortest_path(graph, "A", "B"), ["A", "B"])
+
+    def test_early_stop_before_remaining_neighbors(self):
+        class StopAfterTarget(list):
+            def __iter__(self):
+                yield "B"
+                raise AssertionError("Обход продолжен после обнаружения цели")
+        self.assertEqual(shortest_path({"A": StopAfterTarget(["B", "C"])}, "A", "B"),
+                         ["A", "B"])
+
+    def test_neighbor_only_target_in_disconnected_component(self):
+        self.assertIsNone(shortest_path({"A": [], "X": ["Y"]}, "A", "Y"))
+
+    def test_multiple_paths_follow_neighbor_order(self):
+        self.assertEqual(shortest_path(self.graph, "A", "D"), ["A", "B", "D"])
+        self.graph["A"] = ["C", "B"]
+        self.assertEqual(shortest_path(self.graph, "A", "D"), ["A", "C", "D"])
+
+    def test_unknown_start_all_functions(self):
+        for graph in ({}, self.graph):
+            for call in (lambda: breadth_first_search(graph, "missing"),
+                         lambda: breadth_first_search_details(graph, "missing"),
+                         lambda: shortest_path(graph, "missing", "missing")):
+                with self.assertRaisesRegex(ValueError, "Начальная"):
+                    call()
+
+    def test_none_target_and_neighbor_only_start(self):
+        self.assertEqual(shortest_path({"A": [None]}, "A", None), ["A", None])
+        self.assertEqual(shortest_path({"A": [None]}, None, None), [None])
+        self.assertIsNone(shortest_path({"A": [None]}, None, "A"))
 
     def test_graph_not_modified(self):
         original = {vertex: neighbors.copy() for vertex, neighbors in self.graph.items()}
