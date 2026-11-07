@@ -19,7 +19,7 @@ from module_3.part_2.level_2 import matrix_max
 from module_3.part_2.level_3 import group_names_by_id
 from module_3.part_3.level_1 import area
 from module_3.part_3.level_2 import short_words
-from module_3.part_3.level_3 import largest_number
+from module_3.part_3.level_3 import largest_number, compare
 from module_3.part_4 import accounts
 from module_3.lesson_3.shopping_list import add_position, remove_position, show_shopping_list
 
@@ -27,6 +27,17 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class Part1Tests(unittest.TestCase):
+    def test_year_limit(self):
+        with self.assertRaises(RuntimeError):
+            years_to_target(1_000_000, "1e30", "0.001")
+        self.assertEqual(years_to_target(100, 121, 10, max_years=2), 2)
+        with self.assertRaises(RuntimeError):
+            years_to_target(100, 121, 10, max_years=1)
+        self.assertEqual(years_to_target(100, 100, 0, max_years=0), 0)
+        with self.assertRaises(ValueError):
+            years_to_target(100, 121, 10, max_years=-1)
+
+
     def test_deposit_growth(self):
         self.assertEqual(years_to_target("100", "121", "10"), 2)
         self.assertEqual(years_to_target("100", "100", "0"), 0)
@@ -35,7 +46,8 @@ class Part1Tests(unittest.TestCase):
     def test_deposit_unreachable(self):
         for values in ((100, 200, 0), (100, 200, -1), (0, 200, 10), (1, 2, "0.1")):
             with self.subTest(values=values):
-                self.assertIsNone(years_to_target(*values))
+                with self.assertRaises(ValueError):
+                    years_to_target(*values)
 
     def test_deposit_floor_policy(self):
         self.assertEqual(years_to_target("100.01", "110.02", "10"), 2)
@@ -52,7 +64,7 @@ class Part1Tests(unittest.TestCase):
         self.assertEqual(output.getvalue(), (MESSAGE + "\n") * 2)
 
     def test_repeat_invalid(self):
-        for count in (0, -1, 1.5, True):
+        for count in (-1, 1.5, True):
             with self.assertRaises(ValueError):
                 repeat_message(count)
 
@@ -64,6 +76,16 @@ class Part1Tests(unittest.TestCase):
 
 
 class Part2Tests(unittest.TestCase):
+    def test_types_do_not_merge(self):
+        self.assertEqual(find_duplicates([1, True, 1.0, "1"]), [])
+        result = find_duplicates([1, True, 1.0, "1"] * 2)
+        self.assertEqual([type(value) for value in result], [int, bool, float, str])
+
+    def test_repeated_name_pairs_and_numeric_ids(self):
+        self.assertEqual(group_names_by_id([("a", 1), ("a", 2), ("b", 1)]),
+                         {1: ["a", "b"], 2: ["a"]})
+
+
     def test_duplicates(self):
         self.assertEqual(find_duplicates([1, 4, 1, 6, "hello", "a", 5, "hello"]), [1, "hello"])
         self.assertEqual(find_duplicates([2, 1, 1, 2, 2]), [2, 1])
@@ -100,6 +122,13 @@ class Part2Tests(unittest.TestCase):
 
 
 class Part3Tests(unittest.TestCase):
+    def test_comparator_transitivity(self):
+        values = ("0", "1", "12", "121", "1212", "3", "30", "9")
+        for a, b, c in itertools.product(values, repeat=3):
+            if compare(a, b) <= 0 and compare(b, c) <= 0:
+                self.assertLessEqual(compare(a, c), 0, (a, b, c))
+
+
     def test_triangle(self):
         for sides in itertools.permutations((3, 4, 5)):
             self.assertEqual(area(*sides), 6.0)
@@ -193,14 +222,13 @@ class ProgramTests(unittest.TestCase):
             ("part_1/level_1.py", "100\n121\n10\n", "2\n"),
             ("part_1/level_2.py", "2\n", (MESSAGE + "\n") * 2),
             ("part_1/level_3.py", "-507\n", "12\n"),
-            ("part_2/level_1.py", '[1, 4, 1, "hello", "hello"]\n',
-             "Список в формате JSON: [1, 'hello']\n"),
-            ("part_2/level_2.py", "[[9, 70], [100, 1]]\n", "Матрица в формате JSON: 100\n"),
-            ("part_2/level_3.py", '{"Анна": "id1", "Иван": "id1"}\n',
-             "Словарь имя: id в формате JSON: {'id1': ['Анна', 'Иван']}\n"),
+            ("part_1/level_2.py", "0\n", ""),
+            ("part_2/level_1.py", "", "[1, 'hello']\n"),
+            ("part_2/level_2.py", "", "100\n"),
+            ("part_2/level_3.py", "", "{1: ['Анна', 'Иван'], 2: ['Анна']}\n"),
             ("part_3/level_1.py", "3 4 5\n", "Три стороны через пробел: 6.0\n"),
-            ("part_3/level_2.py", "Кот из-за don't и мышь\n",
-             "Введите одну строку текста: ['Кот', 'и', 'мышь']\n"),
+            ("part_3/level_2.py", "Кот из-за don't\n\nи мышь\n",
+             "Введите текст. Завершение: Windows - Ctrl+Z и Enter; Linux/macOS - Ctrl+D.\n['Кот', 'и', 'мышь']\n"),
             ("part_3/level_3.py", "3 30 34 5 9\n", "Неотрицательные целые через пробел: 9534330\n"),
         )
         for script, data, expected in cases:
@@ -211,11 +239,8 @@ class ProgramTests(unittest.TestCase):
         cases = (
             ("part_1/level_1.py", "буква\n100\n10\n"),
             ("part_1/level_1.py", "NaN\n100\n10\n"),
-            ("part_1/level_2.py", "нет\n"), ("part_1/level_2.py", "0\n"),
+            ("part_1/level_2.py", "нет\n"), ("part_1/level_2.py", "-1\n"),
             ("part_1/level_3.py", "нет\n"),
-            ("part_2/level_1.py", "[[1], [1]]\n"),
-            ("part_2/level_2.py", "[[]]\n"),
-            ("part_2/level_3.py", '{"имя": []}\n'),
             ("part_3/level_1.py", "1 2\n"), ("part_3/level_1.py", "1 2 3\n"),
             ("part_3/level_3.py", "-12 5\n"), ("part_3/level_3.py", "\n"),
         )
@@ -264,26 +289,20 @@ class AccountsTests(unittest.TestCase):
     def test_invalid_credentials(self):
         for login, password in (("", self.password), (" ", self.password), (" Анна", self.password),
                                 ("x" * 65, self.password), ("Анна", ""), ("Анна", "123"),
-                                ("Анна", " " * 8)):
+                                ("Анна", " " * 8), ("Анна", "x" * 129)):
             with self.assertRaises(ValueError):
                 accounts.register(login, password, self.directory)
         self.assertEqual(list(self.directory.iterdir()), [])
 
-    def test_missing_corrupt_and_existing_have_hash_work(self):
+    def test_missing_and_corrupt_records(self):
         path = accounts.account_path("Анна", self.directory)
         path.parent.mkdir()
-        good = {"login": "Анна", "salt": "ab" * 16, "hash": "cd" * 32}
-        contents = (None, "{", "[]", "{}", '{"login": "Анна", "salt": "bad"}',
-                    json.dumps(dict(good, login="Иван")), json.dumps(good))
+        contents = (None, "{", "[]", "{}", '{"login": "Анна", "salt": "bad"}')
         for content in contents:
             with self.subTest(content=content):
                 if content is not None:
                     path.write_text(content, encoding="utf-8")
-                with patch.object(accounts, "password_hash", return_value="ef" * 32) as hasher:
-                    with patch.object(accounts.hmac, "compare_digest", wraps=accounts.hmac.compare_digest) as compare:
-                        self.assertFalse(accounts.login_function("Анна", self.password, self.directory))
-                    hasher.assert_called_once()
-                    compare.assert_called_once()
+                self.assertFalse(accounts.login_function("Анна", self.password, self.directory))
 
     def test_corrupt_encoding(self):
         path = accounts.account_path("Анна", self.directory)
@@ -309,27 +328,80 @@ class AccountsTests(unittest.TestCase):
             with patch.object(accounts, "NamedTemporaryFile", FailingFile):
                 with self.assertRaises(OSError):
                     self.register()
-        self.assertEqual(list(self.directory.iterdir()), [])
+        self.assertFalse(any(p.is_file() for p in self.directory.rglob("*")))
 
-    def test_replace_failure_cleans_directory_and_pending(self):
+    def test_publish_failure_cleans_pending_and_allows_retry(self):
         with patch.object(accounts, "password_hash", return_value="ab" * 32):
-            with patch.object(Path, "replace", side_effect=OSError("Имитируем сбой замены")):
+            with patch.object(Path, "replace", side_effect=OSError("Имитируем сбой публикации")):
                 with self.assertRaises(OSError):
                     self.register()
-        self.assertEqual(list(self.directory.iterdir()), [])
+        self.assertFalse(any(p.is_file() for p in self.directory.rglob("*")))
+        self.assertTrue(self.register())
 
-    def test_reserved_directory_not_overwritten(self):
+    def test_empty_directory_reused(self):
         path = accounts.account_path("Анна", self.directory)
         path.parent.mkdir()
         with patch.object(accounts, "password_hash", return_value="ab" * 32):
-            self.assertFalse(self.register())
-        self.assertEqual(list(self.directory.iterdir()), [path.parent])
-        self.assertEqual(list(path.parent.iterdir()), [])
+            self.assertTrue(self.register())
+        self.assertEqual(list(path.parent.iterdir()), [path])
 
     def test_path_stays_under_storage(self):
         path = accounts.account_path("../../outside", self.directory)
         self.assertEqual(path.parent.parent, self.directory)
         self.assertEqual(len(path.parent.name), 64)
+
+    def test_version_and_saved_iterations(self):
+        with patch.object(accounts, "ITERATIONS", 1000):
+            self.register()
+        path = accounts.account_path("Анна", self.directory)
+        record = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual((record["version"], record["iterations"]), (2, 1000))
+        with patch.object(accounts, "ITERATIONS", 2000):
+            self.assertTrue(accounts.login_function("Анна", self.password, self.directory))
+
+    def test_legacy_and_unicode(self):
+        import hashlib
+        # Старая запись: ненормализованный логин, нет версии и числа итераций.
+        login = "е\u0308ж"
+        old_path = self.directory / hashlib.sha256(login.encode()).hexdigest() / "account.json"
+        old_path.parent.mkdir()
+        salt = "ab" * 16
+        record = {"login": login, "salt": salt,
+                  "hash": accounts.password_hash(self.password, salt, 600_000)}
+        old_path.write_text(json.dumps(record), encoding="utf-8")
+        before = old_path.read_bytes()
+        with patch.object(accounts, "ITERATIONS", 1000):
+            self.assertTrue(accounts.login_function("ёж", self.password, self.directory))
+            self.assertFalse(accounts.register("ёж", self.password, self.directory))
+        self.assertEqual(old_path.read_bytes(), before)
+
+    def test_normalized_registration(self):
+        with patch.object(accounts, "ITERATIONS", 1000):
+            self.assertTrue(accounts.register("е\u0308ж", self.password, self.directory))
+            self.assertFalse(accounts.register("ёж", self.password, self.directory))
+            self.assertTrue(accounts.login_function("ёж", self.password, self.directory))
+        self.assertEqual(accounts.account_path("е\u0308ж", self.directory),
+                         accounts.account_path("ёж", self.directory))
+        # NFC не объединяет похожие буквы разных алфавитов.
+        self.assertNotEqual(accounts.normalize_login("a"), accounts.normalize_login("а"))
+
+    def test_password_upper_bound(self):
+        with patch.object(accounts, "ITERATIONS", 1000):
+            self.assertTrue(accounts.register("Анна", "x" * 128, self.directory))
+            self.assertTrue(accounts.login_function("Анна", "x" * 128, self.directory))
+        with patch.object(accounts, "password_hash") as hasher:
+            self.assertFalse(accounts.login_function("Анна", "x" * 129, self.directory))
+            hasher.assert_not_called()
+
+    def test_reject_invalid_version_and_iterations(self):
+        path = accounts.account_path("Анна", self.directory)
+        path.parent.mkdir()
+        base = {"login": "Анна", "salt": "ab" * 16, "hash": "cd" * 32}
+        for extra in ({"version": 99, "iterations": 1000}, {"version": 2},
+                      {"version": 2, "iterations": 0}, {"version": 2, "iterations": True},
+                      {"version": 2, "iterations": 2_000_001}, {"iterations": 1000}):
+            path.write_text(json.dumps(dict(base, **extra)), encoding="utf-8")
+            self.assertFalse(accounts.login_function("Анна", self.password, self.directory))
 
     def test_default_directory(self):
         with patch.object(Path, "home", return_value=self.directory):
@@ -338,8 +410,7 @@ class AccountsTests(unittest.TestCase):
 
     def test_main_three_scenarios(self):
         # Проверяем разные ответы 4.1, 4.2, 4.3, используя временное хранилище.
-        original = accounts.account_path
-        with patch.object(accounts, "account_path", side_effect=lambda login, directory=None: original(login, self.directory)):
+        with patch.object(Path, "home", return_value=self.directory):
             with patch.object(accounts, "getpass", return_value=self.password):
                 for action, expected in (("регистрация", "Пользователь создан\n"),
                                          ("регистрация", "Логин занят\n"),

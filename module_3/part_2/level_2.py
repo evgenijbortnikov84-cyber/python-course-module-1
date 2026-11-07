@@ -1,4 +1,3 @@
-import json
 from math import isfinite
 
 
@@ -15,15 +14,7 @@ def matrix_max(matrix):
     return max(max(row) for row in matrix)
 
 
-def main():
-    try:
-        matrix = json.loads(input("Матрица в формате JSON: "))
-        if not isinstance(matrix, list) or any(not isinstance(row, list) for row in matrix):
-            raise ValueError("Ожидается список строк")
-        print(matrix_max(matrix))
-    except (ValueError, TypeError, EOFError):
-        print("Ошибка: нужна непустая числовая матрица без пустых строк")
-
-
 if __name__ == "__main__":
-    main()
+    # Можно заменить числа в этом примере или вызвать matrix_max со своей матрицей.
+    matrix = [[9, 70], [100, 1]]
+    print(matrix_max(matrix))

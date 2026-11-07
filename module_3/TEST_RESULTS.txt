@@ -1,14 +1,19 @@
 test_corrupt_encoding (test_module_3.AccountsTests.test_corrupt_encoding) ... ok
 test_default_directory (test_module_3.AccountsTests.test_default_directory) ... ok
+test_empty_directory_reused (test_module_3.AccountsTests.test_empty_directory_reused) ... ok
 test_invalid_credentials (test_module_3.AccountsTests.test_invalid_credentials) ... ok
+test_legacy_and_unicode (test_module_3.AccountsTests.test_legacy_and_unicode) ... ok
 test_main_input_and_storage_errors (test_module_3.AccountsTests.test_main_input_and_storage_errors) ... ok
 test_main_three_scenarios (test_module_3.AccountsTests.test_main_three_scenarios) ... ok
-test_missing_corrupt_and_existing_have_hash_work (test_module_3.AccountsTests.test_missing_corrupt_and_existing_have_hash_work) ... ok
+test_missing_and_corrupt_records (test_module_3.AccountsTests.test_missing_and_corrupt_records) ... ok
+test_normalized_registration (test_module_3.AccountsTests.test_normalized_registration) ... ok
+test_password_upper_bound (test_module_3.AccountsTests.test_password_upper_bound) ... ok
 test_path_stays_under_storage (test_module_3.AccountsTests.test_path_stays_under_storage) ... ok
+test_publish_failure_cleans_pending_and_allows_retry (test_module_3.AccountsTests.test_publish_failure_cleans_pending_and_allows_retry) ... ok
 test_random_salts (test_module_3.AccountsTests.test_random_salts) ... ok
 test_registration_and_login_real_hash (test_module_3.AccountsTests.test_registration_and_login_real_hash) ... ok
-test_replace_failure_cleans_directory_and_pending (test_module_3.AccountsTests.test_replace_failure_cleans_directory_and_pending) ... ok
-test_reserved_directory_not_overwritten (test_module_3.AccountsTests.test_reserved_directory_not_overwritten) ... ok
+test_reject_invalid_version_and_iterations (test_module_3.AccountsTests.test_reject_invalid_version_and_iterations) ... ok
+test_version_and_saved_iterations (test_module_3.AccountsTests.test_version_and_saved_iterations) ... ok
 test_write_failure_cleans_pending (test_module_3.AccountsTests.test_write_failure_cleans_pending) ... ok
 test_deposit_floor_policy (test_module_3.Part1Tests.test_deposit_floor_policy) ... ok
 test_deposit_growth (test_module_3.Part1Tests.test_deposit_growth) ... ok
@@ -17,13 +22,17 @@ test_deposit_unreachable (test_module_3.Part1Tests.test_deposit_unreachable) ...
 test_digit_sum (test_module_3.Part1Tests.test_digit_sum) ... ok
 test_repeat (test_module_3.Part1Tests.test_repeat) ... ok
 test_repeat_invalid (test_module_3.Part1Tests.test_repeat_invalid) ... ok
+test_year_limit (test_module_3.Part1Tests.test_year_limit) ... ok
 test_duplicates (test_module_3.Part2Tests.test_duplicates) ... ok
 test_duplicates_single_pass_input (test_module_3.Part2Tests.test_duplicates_single_pass_input) ... ok
 test_empty_matrix_or_row (test_module_3.Part2Tests.test_empty_matrix_or_row) ... ok
 test_group_ids (test_module_3.Part2Tests.test_group_ids) ... ok
 test_matrix (test_module_3.Part2Tests.test_matrix) ... ok
 test_matrix_nonfinite_or_wrong_type (test_module_3.Part2Tests.test_matrix_nonfinite_or_wrong_type) ... ok
+test_repeated_name_pairs_and_numeric_ids (test_module_3.Part2Tests.test_repeated_name_pairs_and_numeric_ids) ... ok
+test_types_do_not_merge (test_module_3.Part2Tests.test_types_do_not_merge) ... ok
 test_unhashable_duplicate_input (test_module_3.Part2Tests.test_unhashable_duplicate_input) ... ok
+test_comparator_transitivity (test_module_3.Part3Tests.test_comparator_transitivity) ... ok
 test_invalid_triangle (test_module_3.Part3Tests.test_invalid_triangle) ... ok
 test_largest_invalid (test_module_3.Part3Tests.test_largest_invalid) ... ok
 test_largest_number (test_module_3.Part3Tests.test_largest_number) ... ok
@@ -103,6 +112,6 @@ test_fractional_quantities_and_multiple_batches (test_shopping_list.ShoppingList
 test_list_is_not_saved_between_runs (test_shopping_list.ShoppingListTests.test_list_is_not_saved_between_runs) ... ok
 
 ----------------------------------------------------------------------
-Ran 103 tests in 5.266s
+Ran 112 tests in 5.978s
 
 OK (skipped=1)

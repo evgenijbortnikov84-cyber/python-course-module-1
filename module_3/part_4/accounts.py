@@ -2,96 +2,110 @@ import hashlib
 import hmac
 import json
 import secrets
+import unicodedata
 from getpass import getpass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 ITERATIONS = 600_000
-MIN_PASSWORD_LENGTH = 8
-DUMMY_SALT = "00" * 16
-DUMMY_HASH = "00" * 32
+LEGACY_ITERATIONS = 600_000  # Старый формат всегда использовал именно это число.
+FORMAT_VERSION = 2
+MAX_PASSWORD_LENGTH = 128
+
+
+def normalize_login(login):
+    if not isinstance(login, str):
+        raise ValueError("Логин должен быть строкой")
+    login = unicodedata.normalize("NFC", login)
+    if not login.strip() or len(login) > 64 or login != login.strip():
+        raise ValueError("Логин: от 1 до 64 символов, без пробелов по краям")
+    return login
 
 
 def account_path(login, directory=None):
     directory = Path(directory) if directory is not None else Path.home() / ".python_course_accounts"
-    identifier = hashlib.sha256(login.encode("utf-8")).hexdigest()
+    identifier = hashlib.sha256(normalize_login(login).encode("utf-8")).hexdigest()
     return directory / identifier / "account.json"
 
 
-def password_hash(password, salt):
+def find_account_path(login, directory=None):
+    """Учитывает старые записи с ненормализованным именем, не переписывая их."""
+    path = account_path(login, directory)
+    matches = {path} if path.exists() else set()
+    for old_path in path.parent.parent.glob("*/account.json"):
+        try:
+            record = json.loads(old_path.read_text(encoding="utf-8"))
+            if isinstance(record, dict) and normalize_login(record.get("login")) == normalize_login(login):
+                matches.add(old_path)
+        except (OSError, ValueError):
+            continue
+    if len(matches) > 1:
+        raise ValueError("Несколько старых аккаунтов имеют одинаковый нормализованный логин")
+    return next(iter(matches)) if matches else path
+
+
+def password_hash(password, salt, iterations):
     return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"),
-                               bytes.fromhex(salt), ITERATIONS).hex()
-
-
-def validate_credentials(login, passwd):
-    if not isinstance(login, str) or not login.strip() or len(login) > 64:
-        raise ValueError("Логин должен содержать от 1 до 64 символов и не быть пустым")
-    if login != login.strip():
-        raise ValueError("Уберите пробелы по краям логина")
-    if not isinstance(passwd, str) or len(passwd) < MIN_PASSWORD_LENGTH or not passwd.strip():
-        raise ValueError("Пароль должен содержать не менее 8 символов и не состоять из пробелов")
+                               bytes.fromhex(salt), iterations).hex()
 
 
 def register(login, passwd, directory=None):
-    """True при регистрации, False при занятом логине; ошибки ввода: ValueError."""
-    validate_credentials(login, passwd)
-    path = account_path(login, directory)
+    """Локальный учебный пример: True при успехе, False при занятом логине."""
+    login = normalize_login(login)
+    if not isinstance(passwd, str) or not 8 <= len(passwd) <= MAX_PASSWORD_LENGTH or not passwd.strip():
+        raise ValueError("Пароль: от 8 до 128 символов, не только пробелы")
+    path = find_account_path(login, directory)
     if path.exists():
         return False
     salt = secrets.token_hex(16)
-    record = {"login": login, "salt": salt, "hash": password_hash(passwd, salt)}
-    content = json.dumps(record, ensure_ascii=False).encode("utf-8")
-    path.parent.parent.mkdir(parents=True, exist_ok=True)
+    record = {"version": FORMAT_VERSION, "iterations": ITERATIONS, "login": login,
+              "salt": salt, "hash": password_hash(passwd, salt, ITERATIONS)}
+    path.parent.mkdir(parents=True, exist_ok=True)
     pending = None
     try:
-        with NamedTemporaryFile(dir=path.parent.parent, prefix=".pending-",
-                                delete=False) as temporary:
+        with NamedTemporaryFile(dir=path.parent, prefix=".pending-", delete=False) as temporary:
             pending = Path(temporary.name)
-            temporary.write(content)
-        # Создание каталога резервирует логин; чужую запись не перезаписываем.
-        try:
-            path.parent.mkdir()
-        except FileExistsError:
+            temporary.write(json.dumps(record, ensure_ascii=False).encode("utf-8"))
+        # Учебная программа рассчитана на один запущенный экземпляр.
+        # Пустой каталог после сбоя можно использовать повторно.
+        if path.exists():
             return False
-        try:
-            pending.replace(path)
-        except OSError:
-            path.parent.rmdir()
-            raise
+        pending.replace(path)
     finally:
         if pending is not None:
             pending.unlink(missing_ok=True)
     return True
 
 
-def valid_record(record, login):
-    if not isinstance(record, dict) or record.get("login") != login:
-        return False
-    for key, size in (("salt", 32), ("hash", 64)):
-        value = record.get(key)
-        if (not isinstance(value, str) or len(value) != size
-                or any(char not in "0123456789abcdef" for char in value)):
-            return False
-    return True
+def record_iterations(record):
+    if "version" not in record and "iterations" not in record:
+        return LEGACY_ITERATIONS
+    if type(record.get("version")) is not int or record["version"] != FORMAT_VERSION:
+        raise ValueError("Неизвестная версия записи")
+    value = record.get("iterations")
+    if type(value) is not int or not 1 <= value <= 2_000_000:
+        raise ValueError("Некорректное число итераций")
+    return value
 
 
 def login_function(login, passwd, directory=None):
-    """Ошибка входа возвращает False, включая повреждённую запись."""
-    record = None
-    if isinstance(login, str) and isinstance(passwd, str):
-        try:
-            candidate = json.loads(account_path(login, directory).read_text(encoding="utf-8"))
-            if valid_record(candidate, login):
-                record = candidate
-        except (OSError, ValueError, UnicodeError):
-            pass
-    # Для отсутствующего/битого аккаунта выполняется та же дорогая операция.
-    # Это убирает мгновенный отказ, но не гарантирует тождественное время I/O.
-    salt = record["salt"] if record is not None else DUMMY_SALT
-    expected = record["hash"] if record is not None else DUMMY_HASH
-    actual = password_hash(passwd if isinstance(passwd, str) else "", salt)
-    matches = hmac.compare_digest(actual, expected)
-    return record is not None and matches
+    """Не обещает скрыть существование логина или выровнять время ответа."""
+    if not isinstance(passwd, str) or len(passwd) > MAX_PASSWORD_LENGTH:
+        return False
+    try:
+        login = normalize_login(login)
+        record = json.loads(find_account_path(login, directory).read_text(encoding="utf-8"))
+        if not isinstance(record, dict) or normalize_login(record.get("login")) != login:
+            return False
+        for key, size in (("salt", 32), ("hash", 64)):
+            value = record.get(key)
+            if (not isinstance(value, str) or len(value) != size
+                    or any(char not in "0123456789abcdef" for char in value)):
+                return False
+        actual = password_hash(passwd, record["salt"], record_iterations(record))
+        return hmac.compare_digest(actual, record["hash"])
+    except (OSError, ValueError):
+        return False
 
 
 def main():

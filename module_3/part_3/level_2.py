@@ -1,4 +1,5 @@
 import re
+import sys
 
 MAX_WORD_LENGTH = 5  # Возвращаем слова строго короче пяти символов.
 # [^\W\d_] означает символ слова, кроме цифр и подчёркивания.
@@ -13,7 +14,5 @@ def short_words(text, max_length=MAX_WORD_LENGTH):
 
 
 if __name__ == "__main__":
-    try:
-        print(short_words(input("Введите одну строку текста: ")))
-    except EOFError:
-        print("Ошибка: текст не введён")
+    print("Введите текст. Завершение: Windows - Ctrl+Z и Enter; Linux/macOS - Ctrl+D.")
+    print(short_words(sys.stdin.read()))
