@@ -1,38 +1,38 @@
 import json
 import os
+import secrets
 import stat
+from dataclasses import dataclass, fields
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 
 
+@dataclass
 class Model:
-    # Подкласс явно перечисляет поля и допустимые типы.
-    fields = {}
-
     @classmethod
     def validate(cls, values):
-        if not isinstance(values, dict) or set(values) != set(cls.fields):
+        declared = fields(cls)
+        if not isinstance(values, dict) or set(values) != {field.name for field in declared}:
             raise ValueError("Набор полей не соответствует модели")
-        for name, expected_type in cls.fields.items():
-            if not isinstance(values[name], expected_type):
-                raise ValueError(f"Неверный тип поля {name}")
+        for field in declared:
+            # Поддерживаются конкретные типы, без Union и строковых аннотаций.
+            if type(values[field.name]) is not field.type:
+                raise ValueError(f"Неверный тип поля {field.name}")
 
     def save(self, filename):
-        """Атомарно заменяет JSON-файл; ничего не возвращает."""
-        # Произвольные свойства не перебираются. Поля задаёт автор модели.
-        values = {name: getattr(self, name) for name in self.fields}
+        """Заменяет JSON-файл после успешной записи; возвращает None."""
+        values = {field.name: getattr(self, field.name) for field in fields(self)}
         self.validate(values)
         content = json.dumps(values, ensure_ascii=False, indent=2)
         path = Path(filename)
         mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else None
+        temporary_path = path.with_name(".model-" + secrets.token_hex(16) + ".tmp")
         pending = None
         try:
-            with NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
-                                    prefix=".model-", suffix=".tmp", delete=False) as temporary:
-                pending = Path(temporary.name)
+            # Режим x не перезаписывает чужой файл при совпадении имени.
+            # Новый файл получает обычные права open: 0666 с учётом umask на POSIX.
+            with open(temporary_path, "x", encoding="utf-8") as temporary:
+                pending = temporary_path
                 temporary.write(content)
-            # На POSIX сохраняем прежние права. Новый файл остаётся 0600.
-            # На Windows доступ определяется ACL каталога, а не POSIX mode.
             if mode is not None and os.name == "posix":
                 pending.chmod(mode)
             pending.replace(path)
@@ -42,26 +42,20 @@ class Model:
 
     @classmethod
     def load(cls, filename):
-        """Загружает модель с конструктором без аргументов.
-
-        Ошибки структуры/JSON: ValueError; ошибки доступа: OSError.
-        """
+        """Ошибки JSON/полей: ValueError; ошибки файловой системы: OSError."""
         try:
             values = json.loads(Path(filename).read_text(encoding="utf-8"))
         except json.JSONDecodeError as error:
             raise ValueError("Файл содержит некорректный JSON") from error
         cls.validate(values)
-        model = cls()
-        for name, value in values.items():
-            setattr(model, name, value)
-        return model
+        return cls(**values)
 
 
+@dataclass
 class Article(Model):
-    fields = {"title": str, "text": str, "author": str}
-    title = "Заголовок"
-    text = "Текст статьи"
-    author = "Автор"
+    title: str = "Заголовок"
+    text: str = "Текст статьи"
+    author: str = "Автор"
 
 
 if __name__ == "__main__":

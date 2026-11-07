@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import json
 import os
 import stat
@@ -11,7 +12,7 @@ from unittest.mock import patch
 from module_5.part_1.string_var import StringVar
 from module_5.part_1.point import Point
 from module_5.part_1.warrior import Warrior
-from module_5.part_1.arena import ArenaWarrior, Arena, RandomSource, Hit, ATTACK, DEFEND
+from module_5.part_1.arena import ArenaWarrior, Arena, RandomSource, Attack, ATTACK, DEFEND
 from module_5.part_2.model import Article, Model
 
 
@@ -48,6 +49,18 @@ class BasicTests(unittest.TestCase):
         self.assertEqual(value.distance_to(Point()), 5)
         value.move(1, -2)
         self.assertEqual(value, Point(4, 2))
+
+    def test_mutable_point_is_unhashable(self):
+        point = Point(1, 2)
+        with self.assertRaises(TypeError):
+            {point}
+        with self.assertRaises(TypeError):
+            {point: "value"}
+        snapshot = (point.x, point.y)
+        positions = {snapshot}
+        point.move(1, 1)
+        self.assertIn((1, 2), positions)
+        self.assertEqual(point, Point(2, 3))
 
     def test_point_equality(self):
         self.assertEqual(Point(1, 2), Point(1, 2))
@@ -89,33 +102,34 @@ class ArenaTests(unittest.TestCase):
         self.assertIsInstance(ArenaWarrior("A"), Warrior)
 
     def test_protection_and_armor(self):
-        warrior = ArenaWarrior("A")
+        warrior = ArenaWarrior("A", FixedSource())
         warrior.defend()
-        self.assertEqual(warrior.take_damage(Hit(30, 20, 10)), 20)
+        self.assertEqual(warrior.receive_attack(Attack(30)), 20)
         self.assertEqual((warrior.health, warrior.armor), (80, 90))
         warrior.start_round()
         self.assertFalse(warrior.defending)
 
     def test_no_armor(self):
-        warrior = ArenaWarrior("A")
+        warrior = ArenaWarrior("A", FixedSource())
         warrior.defend()
-        warrior.take_damage(Hit(30, 0, 100))
+        for _ in range(10):
+            warrior.receive_attack(Attack(0))
         self.assertEqual(warrior.armor, 0)
-        self.assertEqual(warrior.take_damage(Hit(30, 0, 10)), 30)
+        self.assertEqual(warrior.receive_attack(Attack(30)), 30)
         self.assertEqual(warrior.armor, 0)
 
     def test_no_defense_does_not_consume_armor(self):
-        warrior = ArenaWarrior("A")
-        self.assertEqual(warrior.take_damage(Hit(30, 0, 100)), 30)
+        warrior = ArenaWarrior("A", FixedSource())
+        self.assertEqual(warrior.receive_attack(Attack(30)), 30)
         self.assertEqual(warrior.armor, 100)
 
     def test_exhaustion(self):
-        warrior = ArenaWarrior("A")
+        warrior = ArenaWarrior("A", FixedSource())
         source = FixedSource()
         for _ in range(10):
-            self.assertEqual(warrior.prepare_hit(source).normal, 30)
-        hit = warrior.prepare_hit(source)
-        self.assertEqual((hit.normal, hit.protected, warrior.endurance), (10, 10, 0))
+            self.assertEqual(warrior.prepare_attack().power, 30)
+        hit = warrior.prepare_attack()
+        self.assertEqual((hit.power, hit.exhausted, warrior.endurance), (10, True, 0))
 
     def test_simultaneous_tie(self):
         first, second = self.pair()
@@ -156,11 +170,73 @@ class ArenaTests(unittest.TestCase):
                 Arena(warriors)
 
     def test_invalid_hit_does_not_change_state(self):
-        warrior = ArenaWarrior("A")
+        warrior = ArenaWarrior("A", FixedSource())
         warrior.defend()
         with self.assertRaises(ValueError):
-            warrior.take_damage(Hit(-1, 2, 5))
+            warrior.receive_attack(Attack(-1))
         self.assertEqual((warrior.health, warrior.armor), (100, 100))
+
+    def test_attack_substitution(self):
+        # Одинаковый вызов для базового класса и наследника, в обоих направлениях.
+        for attacker in (Warrior("A"), ArenaWarrior("A", FixedSource())):
+            for opponent in (Warrior("B"), ArenaWarrior("B", FixedSource())):
+                self.assertGreater(attacker.attack(opponent), 0)
+
+    def test_receiver_can_dodge_without_changing_attacker(self):
+        class DodgingWarrior(ArenaWarrior):
+            def receive_attack(self, attack):
+                return 0
+        attacker = ArenaWarrior("A", FixedSource())
+        opponent = DodgingWarrior("B")
+        self.assertEqual(attacker.attack(opponent), 0)
+        self.assertEqual(opponent.health, 100)
+
+    def test_arena_calls_attack(self):
+        first, second = self.pair()
+        with patch.object(first, "attack", wraps=first.attack) as attack:
+            Arena((first, second), FixedSource()).round()
+            attack.assert_called_once_with(second)
+
+    def test_take_damage_has_only_numeric_contract(self):
+        for warrior in (Warrior("A"), ArenaWarrior("A")):
+            with self.assertRaises(ValueError):
+                warrior.take_damage(Attack(20))
+            warrior.take_damage(20)
+            self.assertEqual(warrior.health, 80)
+
+    def test_random_protocol_and_return_validation(self):
+        class Incomplete:
+            def roll_damage(self, bounds):
+                return 10
+        with self.assertRaises(TypeError):
+            Arena(self.pair(), Incomplete())
+        with self.assertRaises(TypeError):
+            ArenaWarrior("A", Incomplete())
+        source = FixedSource()
+        source.roll_damage = lambda bounds: True
+        warrior = ArenaWarrior("A", source)
+        with self.assertRaises(ValueError):
+            warrior.prepare_attack()
+        self.assertEqual(warrior.endurance, 100)
+
+    def test_only_needed_rolls_are_used(self):
+        source = FixedSource()
+        first, second = ArenaWarrior("A", source), ArenaWarrior("B", source)
+        with patch.object(source, "roll_damage", wraps=source.roll_damage) as roll:
+            first.attack(second)
+            self.assertEqual(roll.call_count, 1)
+            second.defend()
+            first.attack(second)
+            self.assertEqual(roll.call_count, 3)  # Один удар и одна потеря брони.
+
+    def test_exhausted_attack_against_defense(self):
+        source = FixedSource()
+        first, second = ArenaWarrior("A", source), ArenaWarrior("B", source)
+        for _ in range(10):
+            first.prepare_attack()
+        second.defend()
+        self.assertEqual(first.attack(second), 10)
+        self.assertEqual(second.armor, 90)
 
     def test_invalid_action(self):
         arena = Arena(self.pair(), FixedSource(("ошибка", ATTACK)))
@@ -211,9 +287,9 @@ class ModelTests(unittest.TestCase):
             Article.load(self.path)
 
     def test_serialization_failure_preserves_original(self):
+        @dataclass
         class Invalid(Model):
-            fields = {"value": object}
-            value = object()
+            value: object = object()
         self.path.write_text("original", encoding="utf-8")
         with self.assertRaises(TypeError):
             Invalid().save(self.path)
@@ -222,12 +298,11 @@ class ModelTests(unittest.TestCase):
 
     def test_write_failure_cleans_temp(self):
         from module_5.part_2 import model
-        real_factory = model.NamedTemporaryFile
+        real_factory = open
 
         class FailingFile:
-            def __init__(self, **kwargs):
-                self.file = real_factory(**kwargs)
-                self.name = self.file.name
+            def __init__(self, *args, **kwargs):
+                self.file = real_factory(*args, **kwargs)
             def __enter__(self):
                 return self
             def write(self, content):
@@ -237,7 +312,7 @@ class ModelTests(unittest.TestCase):
                 self.file.close()
 
         self.path.write_text("original", encoding="utf-8")
-        with patch.object(model, "NamedTemporaryFile", FailingFile):
+        with patch.object(model, "open", FailingFile, create=True):
             with self.assertRaises(OSError):
                 Article().save(self.path)
         self.assertEqual(self.path.read_text(), "original")
@@ -254,10 +329,42 @@ class ModelTests(unittest.TestCase):
     @unittest.skipUnless(os.name == "posix", "Права POSIX проверяются на POSIX")
     def test_posix_permissions(self):
         Article().save(self.path)
-        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o600)
+        reference = self.path.parent / "ordinary.txt"
+        reference.write_text("test")
+        self.assertEqual(stat.S_IMODE(self.path.stat().st_mode),
+                         stat.S_IMODE(reference.stat().st_mode))
         self.path.chmod(0o640)
         Article().save(self.path)
         self.assertEqual(stat.S_IMODE(self.path.stat().st_mode), 0o640)
+
+    def test_strict_int_field(self):
+        @dataclass
+        class Counter(Model):
+            count: int = 0
+        value = Counter(True)
+        with self.assertRaises(ValueError):
+            value.save(self.path)
+        self.path.write_text('{"count": true}', encoding="utf-8")
+        with self.assertRaises(ValueError):
+            Counter.load(self.path)
+        Counter(2).save(self.path)
+        self.assertEqual(Counter.load(self.path).count, 2)
+
+    def test_new_field_is_saved_without_second_declaration(self):
+        @dataclass
+        class Extended(Article):
+            views: int = 0
+        Extended(views=5).save(self.path)
+        self.assertEqual(Extended.load(self.path).views, 5)
+
+    def test_temp_name_collision_preserves_existing_file(self):
+        from module_5.part_2 import model
+        collision = self.path.parent / ".model-fixed.tmp"
+        collision.write_text("keep", encoding="utf-8")
+        with patch.object(model.secrets, "token_hex", return_value="fixed"):
+            with self.assertRaises(FileExistsError):
+                Article().save(self.path)
+        self.assertEqual(collision.read_text(encoding="utf-8"), "keep")
 
     def test_entry_points(self):
         root = Path(__file__).resolve().parents[1]

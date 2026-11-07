@@ -1,13 +1,19 @@
 import random
 
+if __package__:
+    from .combat import Attack, RandomProvider, RandomSource, check_source
+else:
+    from combat import Attack, RandomProvider, RandomSource, check_source
+
 START_HEALTH = 100
 SIMPLE_DAMAGE = 20
 
 
 class Warrior:
-    def __init__(self, name):
+    def __init__(self, name, source: RandomProvider | None = None):
         self.name = name
         self._health = START_HEALTH
+        self.set_random_source(source if source is not None else RandomSource())
 
     @property
     def health(self):
@@ -20,8 +26,17 @@ class Warrior:
         self._health -= lost
         return lost
 
+    def set_random_source(self, source: RandomProvider):
+        self._source = check_source(source)
+
+    def prepare_attack(self):
+        return Attack(SIMPLE_DAMAGE)
+
+    def receive_attack(self, attack: Attack):
+        return self.take_damage(attack.power)
+
     def attack(self, opponent):
-        return opponent.take_damage(SIMPLE_DAMAGE)
+        return opponent.receive_attack(self.prepare_attack())
 
     def finish(self, *, spare):
         self._health = max(1, self._health) if spare else 0
