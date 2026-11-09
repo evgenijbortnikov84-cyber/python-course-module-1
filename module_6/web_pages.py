@@ -31,7 +31,7 @@ def main():
     parallel = time.perf_counter() - start
 
     for link, first, second in zip(LINKS, sequential_pages, parallel_pages):
-        print(f"{link} — символов последовательно/параллельно: "
+        print(f"{link} - символов последовательно/параллельно: "
               f"{len(first)}/{len(second)}")
     print(f"Последовательно: {sequential:.3f} с")
     print(f"Параллельно: {parallel:.3f} с")
